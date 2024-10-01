@@ -14,6 +14,7 @@ function extractRelevantInfo(rawData) {
     Status: '',
     NameServers: [],
     RegistrantContact: {
+      Name: '',
       Organization: '',
       State: '',
       Country: '',
@@ -23,13 +24,17 @@ function extractRelevantInfo(rawData) {
 
   lines.forEach(line => {
     const trimmedLine = line.trim();
+
     if (trimmedLine.startsWith('Registrar:')) {
       relevantData.DomainRegistrar = trimmedLine.split(': ')[1];
     }
     if (trimmedLine.startsWith('Creation Date:')) {
       relevantData.RegisteredOn = trimmedLine.split(': ')[1];
     }
-    if (trimmedLine.startsWith('Registry Expiry Date:')) {
+    if (trimmedLine.startsWith('Registry Expiry Date:') || 
+        trimmedLine.startsWith('Expiry Date:') ||
+        trimmedLine.startsWith('Expiration Date:') ||
+        trimmedLine.startsWith('Registrar Expiry:')) {
       relevantData.ExpiresOn = trimmedLine.split(': ')[1];
     }
     if (trimmedLine.startsWith('Updated Date:')) {
@@ -40,6 +45,9 @@ function extractRelevantInfo(rawData) {
     }
     if (trimmedLine.startsWith('Name Server:')) {
       relevantData.NameServers.push(trimmedLine.split(': ')[1]);
+    }
+    if (trimmedLine.startsWith('Registrant Name:')) {
+      relevantData.RegistrantContact.Name = trimmedLine.split(': ')[1];
     }
     if (trimmedLine.startsWith('Registrant Organization:')) {
       relevantData.RegistrantContact.Organization = trimmedLine.split(': ')[1];
