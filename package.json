@@ -1,0 +1,13 @@
+{
+  "name": "whois-api",
+  "version": "1.0.0",
+  "description": "A simple WHOIS API using Node.js and Express",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "whois": "^2.11.5"
+  }
+}
