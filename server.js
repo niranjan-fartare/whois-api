@@ -2,12 +2,17 @@ const express = require('express');
 const whois = require('whois');
 const cors = require('cors');
 const app = express();
-const port = process.env.PORT || 3000;  // Render uses PORT from environment variables
+const port = process.env.PORT || 3000;
 
-// Enable CORS for all routes
 app.use(cors());
 
-// Utility function to extract required fields from the WHOIS data
+function sanitizeAndFormatDate(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString; // Return original if invalid
+  return date.toISOString();
+}
+
 function extractRelevantInfo(rawData) {
   const lines = rawData.split('\n');
   const relevantData = {
@@ -27,54 +32,60 @@ function extractRelevantInfo(rawData) {
   };
 
   lines.forEach(line => {
-    const trimmedLine = line.trim().toLowerCase();
+    const [key, ...valueParts] = line.split(':').map(part => part.trim());
+    const value = valueParts.join(':').toLowerCase();
 
-    if (trimmedLine.includes('registrar:')) {
-      relevantData.DomainRegistrar = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('creation date:') || trimmedLine.includes('created:') || trimmedLine.includes('registered:')) {
-      relevantData.RegisteredOn = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('registry expiry date:') || trimmedLine.includes('expiration date:') || trimmedLine.includes('expires:')) {
-      relevantData.ExpiresOn = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('updated date:') || trimmedLine.includes('last updated:')) {
-      relevantData.UpdatedOn = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('domain status:')) {
-      relevantData.Status.push(trimmedLine.split(':')[1].trim());
-    }
-    if (trimmedLine.includes('name server:')) {
-      relevantData.NameServers.push(trimmedLine.split(':')[1].trim());
-    }
-    if (trimmedLine.includes('registrant name:')) {
-      relevantData.RegistrantContact.Name = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('registrant organization:')) {
-      relevantData.RegistrantContact.Organization = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('registrant state/province:')) {
-      relevantData.RegistrantContact.State = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('registrant country:')) {
-      relevantData.RegistrantContact.Country = trimmedLine.split(':')[1].trim();
-    }
-    if (trimmedLine.includes('registrant email:')) {
-      relevantData.RegistrantContact.Email = trimmedLine.split(':')[1].trim();
+    switch (key.toLowerCase()) {
+      case 'registrar':
+        relevantData.DomainRegistrar = value;
+        break;
+      case 'creation date':
+      case 'created':
+      case 'registered':
+        relevantData.RegisteredOn = sanitizeAndFormatDate(value);
+        break;
+      case 'registry expiry date':
+      case 'expiration date':
+      case 'expires':
+        relevantData.ExpiresOn = sanitizeAndFormatDate(value);
+        break;
+      case 'updated date':
+      case 'last updated':
+        relevantData.UpdatedOn = sanitizeAndFormatDate(value);
+        break;
+      case 'domain status':
+        relevantData.Status.push(value.split(' ')[0]); // Only keep the status code
+        break;
+      case 'name server':
+        relevantData.NameServers.push(value);
+        break;
+      case 'registrant name':
+        relevantData.RegistrantContact.Name = '[Redacted for Privacy]';
+        break;
+      case 'registrant organization':
+        relevantData.RegistrantContact.Organization = value;
+        break;
+      case 'registrant state/province':
+        relevantData.RegistrantContact.State = value;
+        break;
+      case 'registrant country':
+        relevantData.RegistrantContact.Country = value.toUpperCase();
+        break;
+      case 'registrant email':
+        relevantData.RegistrantContact.Email = '[Redacted for Privacy]';
+        break;
     }
   });
 
-  // Clean up empty arrays
+  // Clean up empty arrays and objects
   if (relevantData.Status.length === 0) delete relevantData.Status;
   if (relevantData.NameServers.length === 0) delete relevantData.NameServers;
 
-  // Remove empty fields from RegistrantContact
   Object.keys(relevantData.RegistrantContact).forEach(key => {
     if (!relevantData.RegistrantContact[key]) delete relevantData.RegistrantContact[key];
   });
   if (Object.keys(relevantData.RegistrantContact).length === 0) delete relevantData.RegistrantContact;
 
-  // Remove empty fields from the main object
   Object.keys(relevantData).forEach(key => {
     if (!relevantData[key] || (Array.isArray(relevantData[key]) && relevantData[key].length === 0)) {
       delete relevantData[key];
@@ -84,7 +95,6 @@ function extractRelevantInfo(rawData) {
   return relevantData;
 }
 
-// WHOIS Lookup Route
 app.get('/whois', (req, res) => {
   const domain = req.query.domain;
 
@@ -102,13 +112,11 @@ app.get('/whois', (req, res) => {
   });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server
 app.listen(port, () => {
   console.log(`WHOIS API is running on http://localhost:${port}`);
 });
