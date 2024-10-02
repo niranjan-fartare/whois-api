@@ -1,7 +1,11 @@
 const express = require('express');
 const whois = require('whois');
+const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;  // Render uses PORT from environment variables
+
+// Enable CORS for all routes
+app.use(cors());
 
 // Utility function to extract required fields from the WHOIS data
 function extractRelevantInfo(rawData) {
