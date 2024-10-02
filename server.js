@@ -11,7 +11,7 @@ function extractRelevantInfo(rawData) {
     RegisteredOn: '',
     ExpiresOn: '',
     UpdatedOn: '',
-    Status: '',
+    Status: [],
     NameServers: [],
     RegistrantContact: {
       Name: '',
@@ -23,44 +23,57 @@ function extractRelevantInfo(rawData) {
   };
 
   lines.forEach(line => {
-    const trimmedLine = line.trim();
+    const trimmedLine = line.trim().toLowerCase();
 
-    if (trimmedLine.startsWith('Registrar:')) {
-      relevantData.DomainRegistrar = trimmedLine.split(': ')[1];
+    if (trimmedLine.includes('registrar:')) {
+      relevantData.DomainRegistrar = trimmedLine.split(':')[1].trim();
     }
-    if (trimmedLine.startsWith('Creation Date:')) {
-      relevantData.RegisteredOn = trimmedLine.split(': ')[1];
+    if (trimmedLine.includes('creation date:') || trimmedLine.includes('created:') || trimmedLine.includes('registered:')) {
+      relevantData.RegisteredOn = trimmedLine.split(':')[1].trim();
     }
-    if (trimmedLine.startsWith('Registrar Registration Expiration Date:') ||
-      trimmedLine.startsWith('Registry Expiry Date:') || 
-      trimmedLine.startsWith('Expiry Date:') || 
-      trimmedLine.startsWith('Expiration Date:')) {
-      relevantData.ExpiresOn = trimmedLine.split(': ')[1];
+    if (trimmedLine.includes('registry expiry date:') || trimmedLine.includes('expiration date:') || trimmedLine.includes('expires:')) {
+      relevantData.ExpiresOn = trimmedLine.split(':')[1].trim();
     }
+    if (trimmedLine.includes('updated date:') || trimmedLine.includes('last updated:')) {
+      relevantData.UpdatedOn = trimmedLine.split(':')[1].trim();
+    }
+    if (trimmedLine.includes('domain status:')) {
+      relevantData.Status.push(trimmedLine.split(':')[1].trim());
+    }
+    if (trimmedLine.includes('name server:')) {
+      relevantData.NameServers.push(trimmedLine.split(':')[1].trim());
+    }
+    if (trimmedLine.includes('registrant name:')) {
+      relevantData.RegistrantContact.Name = trimmedLine.split(':')[1].trim();
+    }
+    if (trimmedLine.includes('registrant organization:')) {
+      relevantData.RegistrantContact.Organization = trimmedLine.split(':')[1].trim();
+    }
+    if (trimmedLine.includes('registrant state/province:')) {
+      relevantData.RegistrantContact.State = trimmedLine.split(':')[1].trim();
+    }
+    if (trimmedLine.includes('registrant country:')) {
+      relevantData.RegistrantContact.Country = trimmedLine.split(':')[1].trim();
+    }
+    if (trimmedLine.includes('registrant email:')) {
+      relevantData.RegistrantContact.Email = trimmedLine.split(':')[1].trim();
+    }
+  });
 
-    if (trimmedLine.startsWith('Updated Date:')) {
-      relevantData.UpdatedOn = trimmedLine.split(': ')[1];
-    }
-    if (trimmedLine.startsWith('Domain Status:')) {
-      relevantData.Status = trimmedLine.split(': ')[1];
-    }
-    if (trimmedLine.startsWith('Name Server:')) {
-      relevantData.NameServers.push(trimmedLine.split(': ')[1]);
-    }
-    if (trimmedLine.startsWith('Registrant Name:')) {
-      relevantData.RegistrantContact.Name = trimmedLine.split(': ')[1];
-    }
-    if (trimmedLine.startsWith('Registrant Organization:')) {
-      relevantData.RegistrantContact.Organization = trimmedLine.split(': ')[1];
-    }
-    if (trimmedLine.startsWith('Registrant State/Province:')) {
-      relevantData.RegistrantContact.State = trimmedLine.split(': ')[1];
-    }
-    if (trimmedLine.startsWith('Registrant Country:')) {
-      relevantData.RegistrantContact.Country = trimmedLine.split(': ')[1];
-    }
-    if (trimmedLine.startsWith('Registrant Email:')) {
-      relevantData.RegistrantContact.Email = trimmedLine.split(': ')[1];
+  // Clean up empty arrays
+  if (relevantData.Status.length === 0) delete relevantData.Status;
+  if (relevantData.NameServers.length === 0) delete relevantData.NameServers;
+
+  // Remove empty fields from RegistrantContact
+  Object.keys(relevantData.RegistrantContact).forEach(key => {
+    if (!relevantData.RegistrantContact[key]) delete relevantData.RegistrantContact[key];
+  });
+  if (Object.keys(relevantData.RegistrantContact).length === 0) delete relevantData.RegistrantContact;
+
+  // Remove empty fields from the main object
+  Object.keys(relevantData).forEach(key => {
+    if (!relevantData[key] || (Array.isArray(relevantData[key]) && relevantData[key].length === 0)) {
+      delete relevantData[key];
     }
   });
 
@@ -83,6 +96,12 @@ app.get('/whois', (req, res) => {
     const filteredData = extractRelevantInfo(data);
     res.status(200).json({ domain, whois: filteredData });
   });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
 // Start server
