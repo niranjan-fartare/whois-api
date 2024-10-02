@@ -6,89 +6,47 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 
-function sanitizeAndFormatDate(dateString) {
+function formatDate(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString; // Return original if invalid
-  return date.toISOString();
+  return date.toLocaleDateString('en-US', { 
+    day: 'numeric', 
+    month: 'long', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short'
+  });
 }
 
 function extractRelevantInfo(rawData) {
   const lines = rawData.split('\n');
-  const relevantData = {
-    DomainRegistrar: '',
-    RegisteredOn: '',
-    ExpiresOn: '',
-    UpdatedOn: '',
-    Status: [],
-    NameServers: [],
-    RegistrantContact: {
-      Name: '',
-      Organization: '',
-      State: '',
-      Country: '',
-      Email: ''
-    }
-  };
+  const relevantData = {};
 
   lines.forEach(line => {
     const [key, ...valueParts] = line.split(':').map(part => part.trim());
-    const value = valueParts.join(':').toLowerCase();
+    const value = valueParts.join(':');
 
-    switch (key.toLowerCase()) {
-      case 'registrar':
-        relevantData.DomainRegistrar = value;
-        break;
-      case 'creation date':
-      case 'created':
-      case 'registered':
-        relevantData.RegisteredOn = sanitizeAndFormatDate(value);
-        break;
-      case 'registry expiry date':
-      case 'expiration date':
-      case 'expires':
-        relevantData.ExpiresOn = sanitizeAndFormatDate(value);
-        break;
-      case 'updated date':
-      case 'last updated':
-        relevantData.UpdatedOn = sanitizeAndFormatDate(value);
-        break;
-      case 'domain status':
-        relevantData.Status.push(value.split(' ')[0]); // Only keep the status code
-        break;
-      case 'name server':
-        relevantData.NameServers.push(value);
-        break;
-      case 'registrant name':
-        relevantData.RegistrantContact.Name = '[Redacted for Privacy]';
-        break;
-      case 'registrant organization':
-        relevantData.RegistrantContact.Organization = value;
-        break;
-      case 'registrant state/province':
-        relevantData.RegistrantContact.State = value;
-        break;
-      case 'registrant country':
-        relevantData.RegistrantContact.Country = value.toUpperCase();
-        break;
-      case 'registrant email':
-        relevantData.RegistrantContact.Email = '[Redacted for Privacy]';
-        break;
+    if (key && value) {
+      const formattedKey = key.replace(/\s+/g, '');
+      if (relevantData[formattedKey]) {
+        if (Array.isArray(relevantData[formattedKey])) {
+          relevantData[formattedKey].push(value);
+        } else {
+          relevantData[formattedKey] = [relevantData[formattedKey], value];
+        }
+      } else {
+        relevantData[formattedKey] = value;
+      }
     }
   });
 
-  // Clean up empty arrays and objects
-  if (relevantData.Status.length === 0) delete relevantData.Status;
-  if (relevantData.NameServers.length === 0) delete relevantData.NameServers;
-
-  Object.keys(relevantData.RegistrantContact).forEach(key => {
-    if (!relevantData.RegistrantContact[key]) delete relevantData.RegistrantContact[key];
-  });
-  if (Object.keys(relevantData.RegistrantContact).length === 0) delete relevantData.RegistrantContact;
-
-  Object.keys(relevantData).forEach(key => {
-    if (!relevantData[key] || (Array.isArray(relevantData[key]) && relevantData[key].length === 0)) {
-      delete relevantData[key];
+  // Format dates
+  ['CreationDate', 'UpdatedDate', 'RegistryExpiryDate'].forEach(dateField => {
+    if (relevantData[dateField]) {
+      relevantData[dateField] = formatDate(relevantData[dateField]);
     }
   });
 
